@@ -74,12 +74,12 @@ def edit_word_table(doc_path):
 
 
 def highlight_table_yellow(tbl):
-    # 先標記顏色
-    for row in tbl.rows:
-        for cell in row.cells:
-            cell._element.get_or_add_tcPr().append(
-                parse_xml(r'<w:shd {} w:fill="FFFF00"/>'.format(nsdecls('w')))
-            )
+    # Test: 先標記顏色
+    # for row in tbl.rows:
+    #     for cell in row.cells:
+    #         cell._element.get_or_add_tcPr().append(
+    #             parse_xml(r'<w:shd {} w:fill="FFFF00"/>'.format(nsdecls('w')))
+    #         )
     # 取得欄位索引
     headers = [cell.text.strip() for cell in tbl.rows[0].cells]
     col_count = len(headers)
@@ -93,7 +93,7 @@ def highlight_table_yellow(tbl):
         return  # 已經有 Total: 就不再新增
 
     # 準備加總用
-    purchased_sum = 0.0
+    purchased_sum = 0
     used_sum = 0
     remaining_sum = 0
     purchased_idx = used_idx = remaining_idx = trend_idx = service_idx = None
@@ -114,7 +114,7 @@ def highlight_table_yellow(tbl):
             val = row.cells[purchased_idx].text.strip()
             if val:
                 try:
-                    purchased_sum += float(val)
+                    purchased_sum += int(val)
                 except:
                     pass
         if used_idx is not None:
@@ -135,28 +135,82 @@ def highlight_table_yellow(tbl):
                     pass
     # 新增一列，只填指定欄位
     new_row = tbl.add_row()
+    
+    # 取得上一行的格式作為參考
+    last_data_row = tbl.rows[-2]  # 新增行之前的最後一行
+    
     for idx in range(col_count):
         header = headers[idx]
         cell = new_row.cells[idx]
+        reference_cell = last_data_row.cells[idx]
+        
+        # 複製格式屬性
+        if reference_cell._element.find('.//w:rPr', reference_cell._element.nsmap) is not None:
+            # 複製字體格式
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    if reference_cell.paragraphs and reference_cell.paragraphs[0].runs:
+                        ref_run = reference_cell.paragraphs[0].runs[0]
+                        if ref_run.font.name:
+                            run.font.name = ref_run.font.name
+                        if ref_run.font.size:
+                            run.font.size = ref_run.font.size
+                        if ref_run.bold is not None:
+                            run.bold = ref_run.bold
+                        if ref_run.italic is not None:
+                            run.italic = ref_run.italic
+        
+        # 複製段落對齊方式
+        if reference_cell.paragraphs and cell.paragraphs:
+            if reference_cell.paragraphs[0].alignment is not None:
+                cell.paragraphs[0].alignment = reference_cell.paragraphs[0].alignment
+        
+        # 設置內容
+        content = ''
         if header == 'Service':
-            cell.text = 'Total:'
+            content = ' Total:'
+        elif header == 'Type':
+            content = ' Hour'
         elif header == 'Purchased':
-            cell.text = f"{purchased_sum}"
+            content = f"{purchased_sum}"
         elif header == 'Used':
             h = used_sum // 60
             m = used_sum % 60
-            cell.text = f"{h}:{m:02d}"
+            content = f"{h}:{m:02d}"
         elif header == 'Remaining':
             h = remaining_sum // 60
             m = remaining_sum % 60
-            cell.text = f"{h}:{m:02d}"
+            content = f"{h}:{m:02d}"
         elif header == 'Trend':
             percent = 0.0
             if purchased_sum > 0:
                 percent = used_sum * 24 / purchased_sum 
-            cell.text = f"{percent:.2f}%"
+            content = f"{percent:.2f}%"
         else:
-            cell.text = ''
+            content = ''
+        
+        # 清空現有內容並重新創建
+        cell.text = ''
+        paragraph = cell.paragraphs[0]
+        
+        # 複製對齊方式
+        if reference_cell.paragraphs and reference_cell.paragraphs[0].alignment is not None:
+            paragraph.alignment = reference_cell.paragraphs[0].alignment
+        
+        # 添加新的run並設置格式
+        run = paragraph.add_run(content)
+        
+        # 複製字體格式
+        if reference_cell.paragraphs and reference_cell.paragraphs[0].runs:
+            ref_run = reference_cell.paragraphs[0].runs[0]
+            if ref_run.font.name:
+                run.font.name = ref_run.font.name
+            if ref_run.font.size:
+                run.font.size = ref_run.font.size
+            if ref_run.bold is not None:
+                run.bold = ref_run.bold
+            if ref_run.italic is not None:
+                run.italic = ref_run.italic
 
 def find_and_highlight_specific_table(doc_path):
     doc = Document(doc_path)
@@ -174,11 +228,11 @@ def find_and_highlight_specific_table(doc_path):
                     if cell.tables:
                         recursive_search(cell.tables)
     recursive_search(doc.tables)
-    outname = 'findtable' + doc_path
+    outname = 'Formatted_' + doc_path
     doc.save(outname)
-    print(f"已將符合條件的表格標記為黃色，並儲存為 {outname}")
+    已Formattedormatted，並儲存為 {outname}")
 
 
 
 
-find_and_highlight_specific_table('Support Services Customer Paginated Report.docx')
+find_and_highlight_specific_table('Pending - Consumption Report - Foxguard ESU Win2012 R2 Y2_July 2025.docx')

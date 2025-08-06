@@ -1,3 +1,4 @@
+# deprecated - For testing purposes only
 from docx import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
