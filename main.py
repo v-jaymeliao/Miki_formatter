@@ -2,6 +2,10 @@ from docx import Document
 from datetime import timedelta
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
+import os
+import glob
+import argparse
+import sys
 
 # Function to convert time format [h]:mm to minutes
 def time_to_minutes(time_str):
@@ -212,7 +216,7 @@ def highlight_table_yellow(tbl):
             if ref_run.italic is not None:
                 run.italic = ref_run.italic
 
-def find_and_highlight_specific_table(doc_path):
+def format_and_calc_table(doc_path):
     doc = Document(doc_path)
     target_headers = ["Package", "Service", "Type", "Purchased", "Used", "Remaining", "Trend"]
 
@@ -228,11 +232,150 @@ def find_and_highlight_specific_table(doc_path):
                     if cell.tables:
                         recursive_search(cell.tables)
     recursive_search(doc.tables)
-    outname = 'Formatted_' + doc_path
+    
+    # 在原文件的同一目錄下創建 successed 子目錄
+    dir_path = os.path.dirname(doc_path)
+    successed_dir = os.path.join(dir_path, "successed")
+    
+    # 確保 successed 目錄存在
+    if not os.path.exists(successed_dir):
+        os.makedirs(successed_dir)
+        print(f"創建目錄: {successed_dir}")
+    
+    filename = os.path.basename(doc_path)
+    name, ext = os.path.splitext(filename)
+    outname = os.path.join(successed_dir, f"Formatted_{name}{ext}")
+    
     doc.save(outname)
-    已Formattedormatted，並儲存為 {outname}")
+    print(f"已格式化，並儲存為 {outname}")
+    return outname
 
+def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
+    """
+    批量處理 Word 文件
+    
+    Args:
+        input_path: 可以是單個文件路徑或目錄路徑
+        recursive: 是否遞歸搜索子目錄
+        file_pattern: 文件過濾模式，默認是 *.docx
+    """
+    processed_files = []
+    failed_files = []
+    
+    # 檢查輸入路徑是文件還是目錄
+    if os.path.isfile(input_path):
+        # 單個文件處理
+        if input_path.lower().endswith('.docx'):
+            try:
+                print(f"處理文件: {input_path}")
+                output_file = format_and_calc_table(input_path)
+                processed_files.append(output_file)
+                print(f"✓ 成功處理: {input_path}")
+            except Exception as e:
+                print(f"✗ 處理失敗: {input_path} - 錯誤: {str(e)}")
+                failed_files.append(input_path)
+        else:
+            print(f"跳過非 Word 文件: {input_path}")
+    
+    elif os.path.isdir(input_path):
+        # 目錄處理
+        if recursive:
+            # 遞歸搜索所有子目錄
+            pattern = os.path.join(input_path, "**", file_pattern)
+            docx_files = glob.glob(pattern, recursive=True)
+        else:
+            # 只搜索當前目錄
+            pattern = os.path.join(input_path, file_pattern)
+            docx_files = glob.glob(pattern)
+        
+        print(f"找到 {len(docx_files)} 個 Word 文件")
+        
+        for docx_file in docx_files:
+            # 跳過已經格式化的文件
+            if os.path.basename(docx_file).startswith('Formatted_'):
+                print(f"跳過已格式化的文件: {docx_file}")
+                continue
+                
+            try:
+                print(f"處理文件: {docx_file}")
+                output_file = format_and_calc_table(docx_file)
+                processed_files.append(output_file)
+                print(f"✓ 成功處理: {docx_file}")
+            except Exception as e:
+                print(f"✗ 處理失敗: {docx_file} - 錯誤: {str(e)}")
+                failed_files.append(docx_file)
+    
+    else:
+        print(f"錯誤: 路徑不存在 - {input_path}")
+        return
+    
+    # 顯示處理結果摘要
+    print("\n" + "="*50)
+    print("處理結果摘要:")
+    print(f"成功處理: {len(processed_files)} 個文件")
+    print(f"處理失敗: {len(failed_files)} 個文件")
+    
+    if processed_files:
+        print("\n成功處理的文件:")
+        for file in processed_files:
+            print(f"  - {file}")
+    
+    if failed_files:
+        print("\n處理失敗的文件:")
+        for file in failed_files:
+            print(f"  - {file}")
 
+def main():
+    """主函數 - 處理命令行參數"""
+    parser = argparse.ArgumentParser(description='批量格式化 Word 文件中的表格')
+    parser.add_argument('input', help='輸入文件或目錄路徑')
+    parser.add_argument('--no-recursive', action='store_true', 
+                       help='不遞歸搜索子目錄（僅在輸入為目錄時有效）')
+    parser.add_argument('--pattern', default='*.docx', 
+                       help='文件過濾模式（默認: *.docx）')
+    
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.input):
+        print(f"錯誤: 路徑不存在 - {args.input}")
+        sys.exit(1)
+    
+    recursive = not args.no_recursive
+    
+    print("Miki Word 文件格式化工具")
+    print("="*30)
+    print(f"輸入路徑: {args.input}")
+    print(f"遞歸搜索: {'是' if recursive else '否'}")
+    print(f"文件模式: {args.pattern}")
+    print()
+    
+    batch_process_documents(args.input, recursive, args.pattern)
 
-
-find_and_highlight_specific_table('Pending - Consumption Report - Foxguard ESU Win2012 R2 Y2_July 2025.docx')
+if __name__ == "__main__":
+    # 如果沒有命令行參數，提供交互式模式
+    if len(sys.argv) == 1:
+        print("Miki Word 文件格式化工具 - 交互式模式")
+        print("="*40)
+        
+        while True:
+            input_path = input("請輸入文件或目錄路徑 (輸入 'q' 退出): ").strip()
+            
+            if input_path.lower() == 'q':
+                break
+                
+            if not os.path.exists(input_path):
+                print(f"錯誤: 路徑不存在 - {input_path}")
+                continue
+            
+            # 如果是目錄，詢問是否遞歸搜索
+            recursive = True
+            if os.path.isdir(input_path):
+                choice = input("是否遞歸搜索子目錄? (y/n, 默認 y): ").strip().lower()
+                if choice in ['n', 'no']:
+                    recursive = False
+            
+            print()
+            batch_process_documents(input_path, recursive)
+            print("\n" + "="*50 + "\n")
+    else:
+        main()
