@@ -1,29 +1,29 @@
 @echo off
 echo =================================================
-echo    Miki Word 文件格式化工具 - 簡易打包腳本
+echo    Miki Word Document Formatter - Build Script
 echo =================================================
 echo.
 
-echo 檢查 Python 環境...
+echo Checking Python environment...
 python --version
 if errorlevel 1 (
-    echo 錯誤: 找不到 Python！
-    echo 請先安裝 Python 3.6+ 從 https://python.org
+    echo Error: Python not found!
+    echo Please install Python 3.6+ from https://python.org
     pause
     exit /b 1
 )
 echo.
 
-echo 安裝打包工具...
+echo Installing build tools...
 pip install pyinstaller python-docx
 echo.
 
-echo 清理舊檔案...
+echo Cleaning old files...
 if exist "dist" rmdir /s /q dist
 if exist "build" rmdir /s /q build
 echo.
 
-echo 開始打包...
+echo Starting build process...
 pyinstaller --onefile --windowed ^
     --name "MikiFormatter" ^
     --add-data "README.md;." ^
@@ -39,15 +39,15 @@ pyinstaller --onefile --windowed ^
 
 echo.
 if exist "dist\MikiFormatter.exe" (
-    echo ✓ 成功！可執行檔案在: dist\MikiFormatter.exe
+    echo ^> Success! Executable file created: dist\MikiFormatter.exe
     echo.
-    echo 檔案大小: 
+    echo File size: 
     for %%I in ("dist\MikiFormatter.exe") do echo %%~zI bytes
     echo.
-    echo 測試執行...
+    echo Testing execution...
     start "Test" "dist\MikiFormatter.exe"
 ) else (
-    echo ✗ 打包失敗！
+    echo ^> Build failed!
 )
 echo.
 pause
