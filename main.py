@@ -233,18 +233,18 @@ def format_and_calc_table(doc_path):
                         recursive_search(cell.tables)
     recursive_search(doc.tables)
     
-    # 在原文件的同一目錄下創建 successed 子目錄
+    # 在原文件的同一目錄下創建 success 子目錄
     dir_path = os.path.dirname(doc_path)
-    successed_dir = os.path.join(dir_path, "successed")
+    success_dir = os.path.join(dir_path, "success")
     
-    # 確保 successed 目錄存在
-    if not os.path.exists(successed_dir):
-        os.makedirs(successed_dir)
-        print(f"創建目錄: {successed_dir}")
+    # 確保 success 目錄存在
+    if not os.path.exists(success_dir):
+        os.makedirs(success_dir)
+        print(f"創建目錄: {success_dir}")
     
     filename = os.path.basename(doc_path)
     name, ext = os.path.splitext(filename)
-    outname = os.path.join(successed_dir, f"Formatted_{name}{ext}")
+    outname = os.path.join(success_dir, f"Formatted_{name}{ext}")
     
     doc.save(outname)
     print(f"已格式化，並儲存為 {outname}")

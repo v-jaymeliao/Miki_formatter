@@ -8,7 +8,8 @@ class WordFormatterGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Miki Word 文件格式化工具")
-        self.root.geometry("1000x1000")
+        self.root.geometry("800x700")  # 更合適的初始大小
+        self.root.minsize(600, 500)    # 設置最小尺寸
         self.root.resizable(True, True)
         
         # 設置圖標和樣式
@@ -19,6 +20,13 @@ class WordFormatterGUI:
         
         # 創建主框架
         self.create_widgets()
+        
+        # 綁定快捷鍵
+        self.root.bind('<Control-o>', lambda e: self.select_file())
+        self.root.bind('<Control-d>', lambda e: self.select_directory())
+        self.root.bind('<F5>', lambda e: self.start_processing())
+        self.root.bind('<Control-l>', lambda e: self.clear_log())
+        self.root.bind('<F1>', lambda e: self.show_welcome_message())
         
         # 處理狀態
         self.processing = False
@@ -39,119 +47,152 @@ class WordFormatterGUI:
                                  font=("Arial", 11), bg="#f0f0f0", fg="#34495e")
         subtitle_label.pack(pady=(0, 10))
         
-        # 簡單說明
-        instructions_frame = tk.LabelFrame(self.root, text="📋 使用說明", 
-                                         font=("Arial", 10, "bold"), padx=15, pady=10)
-        instructions_frame.pack(pady=10, padx=20, fill='x')
+        # 簡單說明 - 可折疊的框架
+        self.instructions_frame = tk.LabelFrame(self.root, text="📋 使用說明 (點擊展開/收起)", 
+                                         font=("Arial", 10, "bold"), padx=15, pady=5)
+        self.instructions_frame.pack(pady=(5, 10), padx=20, fill='x')
+        
+        # 讓標題可以點擊來切換顯示/隱藏
+        self.instructions_visible = False
+        self.instructions_content = tk.Frame(self.instructions_frame)
+        
+        # 點擊事件
+        self.instructions_frame.bind("<Button-1>", self.toggle_instructions)
         
         instructions = [
             "1️⃣ 點擊下方按鈕選擇要處理的 Word 文件或整個資料夾",
-            "2️⃣ 如果選擇資料夾，可以選擇是否搜尋子資料夾",
+            "2️⃣ 如果選擇資料夾，可以選擇是否搜尋子資料夾", 
             "3️⃣ 點擊「開始處理」按鈕",
-            "4️⃣ 處理完成的文件會自動儲存在原位置的 'successed' 資料夾中",
-            "5️⃣ 原始文件不會被修改"
+            "4️⃣ 處理完成的文件會自動儲存在原位置的 'success' 資料夾中"
         ]
         
         for instruction in instructions:
-            label = tk.Label(instructions_frame, text=instruction, 
+            label = tk.Label(self.instructions_content, text=instruction, 
                            font=("Arial", 9), anchor='w', justify='left')
-            label.pack(anchor='w', pady=2)
+            label.pack(anchor='w', pady=1)
         
-        # 文件/目錄選擇區域
+        # 文件/目錄選擇區域 - 緊湊佈局
         selection_frame = tk.LabelFrame(self.root, text="📂 選擇要處理的文件或資料夾", 
-                                      font=("Arial", 10, "bold"), padx=15, pady=10)
-        selection_frame.pack(pady=10, padx=20, fill='x')
+                                      font=("Arial", 10, "bold"), padx=15, pady=8)
+        selection_frame.pack(pady=5, padx=20, fill='x')
         
         # 大按鈕區域
         big_buttons_frame = tk.Frame(selection_frame)
-        big_buttons_frame.pack(pady=10)
+        big_buttons_frame.pack(pady=5)
         
-        # 選擇單個文件按鈕
-        file_button = tk.Button(big_buttons_frame, text="📄 選擇單個 Word 文件", 
+        # 選擇單個文件按鈕 - 縮小尺寸
+        file_button = tk.Button(big_buttons_frame, text="📄 選擇文件", 
                                command=self.select_file,
-                               bg="#3498db", fg="white", font=("Arial", 12, "bold"),
-                               padx=20, pady=15, relief="raised", bd=3)
-        file_button.pack(side='left', padx=10)
+                               bg="#3498db", fg="white", font=("Arial", 10, "bold"),
+                               padx=15, pady=10, relief="raised", bd=2)
+        file_button.pack(side='left', padx=5)
         
-        # 選擇資料夾按鈕
-        folder_button = tk.Button(big_buttons_frame, text="📁 選擇整個資料夾", 
+        # 選擇資料夾按鈕 - 縮小尺寸
+        folder_button = tk.Button(big_buttons_frame, text="📁 選擇資料夾", 
                                  command=self.select_directory,
-                                 bg="#2ecc71", fg="white", font=("Arial", 12, "bold"),
-                                 padx=20, pady=15, relief="raised", bd=3)
-        folder_button.pack(side='left', padx=10)
+                                 bg="#2ecc71", fg="white", font=("Arial", 10, "bold"),
+                                 padx=15, pady=10, relief="raised", bd=2)
+        folder_button.pack(side='left', padx=5)
         
-        # 顯示選中的路徑
+        # 顯示選中的路徑 - 更緊湊
         path_display_frame = tk.Frame(selection_frame)
-        path_display_frame.pack(fill='x', pady=10)
+        path_display_frame.pack(fill='x', pady=5)
         
-        tk.Label(path_display_frame, text="📍 選中的路徑:", font=("Arial", 9, "bold")).pack(anchor='w')
+        tk.Label(path_display_frame, text="📍 選中:", font=("Arial", 9, "bold")).pack(anchor='w')
         
         self.path_var = tk.StringVar(value="尚未選擇文件或資料夾...")
         path_label = tk.Label(path_display_frame, textvariable=self.path_var, 
-                             font=("Arial", 9), fg="#7f8c8d", wraplength=600, 
-                             justify='left', relief="sunken", bd=1, padx=10, pady=5)
-        path_label.pack(fill='x', pady=5)
+                             font=("Arial", 8), fg="#7f8c8d", wraplength=500, 
+                             justify='left', relief="sunken", bd=1, padx=8, pady=3)
+        path_label.pack(fill='x', pady=2)
         
-        # 選項區域
+        # 選項區域 - 緊湊佈局
         options_frame = tk.LabelFrame(self.root, text="⚙️ 處理選項", 
-                                    font=("Arial", 10, "bold"), padx=15, pady=10)
-        options_frame.pack(pady=10, padx=20, fill='x')
+                                    font=("Arial", 10, "bold"), padx=15, pady=5)
+        options_frame.pack(pady=5, padx=20, fill='x')
         
         self.recursive_var = tk.BooleanVar(value=True)
-        recursive_cb = tk.Checkbutton(options_frame, text="🔄 搜尋子資料夾（包含所有子資料夾中的 Word 文件）", 
+        recursive_cb = tk.Checkbutton(options_frame, text="🔄 搜尋子資料夾", 
                                      variable=self.recursive_var, font=("Arial", 9))
-        recursive_cb.pack(anchor='w', pady=5)
+        recursive_cb.pack(anchor='w', pady=3)
         
-        # 處理按鈕區域
-        action_frame = tk.Frame(self.root, bg="#ecf0f1", relief="ridge", bd=2)
-        action_frame.pack(pady=20, padx=20, fill='x')
+        # 處理按鈕區域 - 緊湊佈局
+        action_frame = tk.Frame(self.root, bg="#ecf0f1", relief="ridge", bd=1)
+        action_frame.pack(pady=5, padx=20, fill='x')
         
         button_container = tk.Frame(action_frame, bg="#ecf0f1")
-        button_container.pack(pady=15)
+        button_container.pack(pady=8)
         
         self.process_button = tk.Button(button_container, text="🚀 開始處理", 
                                        command=self.start_processing,
                                        bg="#e74c3c", fg="white", 
-                                       font=("Arial", 14, "bold"),
-                                       padx=40, pady=15, relief="raised", bd=4)
-        self.process_button.pack(side='left', padx=10)
+                                       font=("Arial", 12, "bold"),
+                                       padx=25, pady=8, relief="raised", bd=3)
+        self.process_button.pack(side='left', padx=5)
         
-        clear_button = tk.Button(button_container, text="🗑️ 清空日誌", 
+        clear_button = tk.Button(button_container, text="🗑️ 清空", 
                                command=self.clear_log,
-                               bg="#95a5a6", fg="white", font=("Arial", 10, "bold"),
-                               padx=20, pady=15, relief="raised", bd=3)
-        clear_button.pack(side='left', padx=10)
+                               bg="#95a5a6", fg="white", font=("Arial", 9, "bold"),
+                               padx=15, pady=8, relief="raised", bd=2)
+        clear_button.pack(side='left', padx=5)
         
-        # 進度條
+        # 進度條 - 緊湊佈局
         progress_frame = tk.Frame(self.root)
-        progress_frame.pack(pady=5, padx=20, fill='x')
+        progress_frame.pack(pady=2, padx=20, fill='x')
         
         tk.Label(progress_frame, text="處理進度:", font=("Arial", 9)).pack(anchor='w')
         self.progress = ttk.Progressbar(progress_frame, mode='indeterminate', style="TProgressbar")
-        self.progress.pack(fill='x', pady=5)
+        self.progress.pack(fill='x', pady=2)
         
-        # 處理日誌區域
+        # 處理日誌區域 - 給予更多空間
         log_frame = tk.LabelFrame(self.root, text="📊 處理日誌", 
-                                font=("Arial", 10, "bold"), padx=10, pady=10)
-        log_frame.pack(pady=10, padx=20, fill='both', expand=True)
+                                font=("Arial", 10, "bold"), padx=5, pady=5)
+        log_frame.pack(pady=5, padx=20, fill='both', expand=True)
         
-        # 創建文本框和滾動條
+        # 創建文本框和滾動條 - 優化佈局
         text_frame = tk.Frame(log_frame)
-        text_frame.pack(fill='both', expand=True)
+        text_frame.pack(fill='both', expand=True, padx=5, pady=5)
         
-        self.log_text = tk.Text(text_frame, wrap=tk.WORD, font=("Consolas", 9), 
-                              bg="#f8f9fa", fg="#2c3e50")
-        scrollbar = tk.Scrollbar(text_frame, orient="vertical", command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=scrollbar.set)
+        # 垂直滾動條
+        scrollbar_v = tk.Scrollbar(text_frame, orient="vertical")
+        scrollbar_v.pack(side="right", fill="y")
+        
+        # 水平滾動條（可選）
+        scrollbar_h = tk.Scrollbar(text_frame, orient="horizontal")
+        scrollbar_h.pack(side="bottom", fill="x")
+        
+        # 文本框 - 設置最小高度確保可見性
+        self.log_text = tk.Text(text_frame, 
+                              wrap=tk.NONE,  # 改為不自動換行以支持水平滾動
+                              font=("Consolas", 9), 
+                              bg="#f8f9fa", 
+                              fg="#2c3e50",
+                              height=10,  # 設置最小高度
+                              yscrollcommand=scrollbar_v.set,
+                              xscrollcommand=scrollbar_h.set)
+        
+        # 配置滾動條
+        scrollbar_v.config(command=self.log_text.yview)
+        scrollbar_h.config(command=self.log_text.xview)
         
         self.log_text.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
         
         # 預設顯示歡迎訊息
         self.log_text.insert(tk.END, "歡迎使用 Miki Word 文件格式化工具！\n")
         self.log_text.insert(tk.END, "請選擇要處理的文件或資料夾，然後點擊「開始處理」。\n")
         self.log_text.insert(tk.END, "=" * 50 + "\n\n")
         
+    def toggle_instructions(self, event=None):
+        """切換使用說明的顯示/隱藏"""
+        if self.instructions_visible:
+            self.instructions_content.pack_forget()
+            self.instructions_frame.config(text="📋 使用說明 (點擊展開)")
+            self.instructions_visible = False
+        else:
+            self.instructions_content.pack(fill='x', pady=5)
+            self.instructions_frame.config(text="📋 使用說明 (點擊收起)")
+            self.instructions_visible = True
+            
     def select_file(self):
         filename = filedialog.askopenfilename(
             title="選擇 Word 文件",
@@ -170,35 +211,46 @@ class WordFormatterGUI:
         welcome_msg = """
 🎉 歡迎使用 Miki Word 文件格式化工具！
 
-這個工具可以幫您：
-✅ 自動為 Word 文件中的表格添加總計行
+功能：
+✅ 自動為 Word 表格添加總計行
 ✅ 批量處理多個文件
 ✅ 保持原始文件不變
-✅ 整理輸出文件到專門的資料夾
 
-使用很簡單：
-1. 選擇要處理的文件或資料夾
-2. 點擊「開始處理」
-3. 等待處理完成
+快捷鍵：
+• Ctrl+O: 選擇文件
+• Ctrl+D: 選擇資料夾  
+• F5: 開始處理
+• Ctrl+L: 清空日誌
+• F1: 顯示此說明
 
-處理後的文件會儲存在原位置的 'successed' 資料夾中。
-
-有問題嗎？請聯繫技術支援。
+處理後的文件會儲存在 'success' 資料夾中。
         """
-        messagebox.showinfo("歡迎使用", welcome_msg)
+        messagebox.showinfo("使用說明", welcome_msg)
             
     def log_message(self, message):
         """線程安全的日誌輸出"""
         self.root.after(0, self._log_message, message)
         
     def _log_message(self, message):
-        """在主線程中輸出日誌"""
+        """在主線程中輸出日誌 - 改進的滾動控制"""
         self.log_text.insert(tk.END, message + "\n")
+        
+        # 自動滾動到底部
         self.log_text.see(tk.END)
+        
+        # 限制日誌行數以避免記憶體問題
+        lines = self.log_text.get(1.0, tk.END).count('\n')
+        if lines > 1000:  # 保留最後1000行
+            self.log_text.delete(1.0, f"{lines-1000}.0")
+        
         self.root.update_idletasks()
         
     def clear_log(self):
+        """清空日誌並顯示歡迎訊息"""
         self.log_text.delete(1.0, tk.END)
+        self.log_text.insert(tk.END, "歡迎使用 Miki Word 文件格式化工具！\n")
+        self.log_text.insert(tk.END, "請選擇要處理的文件或資料夾，然後點擊「開始處理」。\n")
+        self.log_text.insert(tk.END, "=" * 50 + "\n\n")
         
     def start_processing(self):
         if self.processing:
@@ -251,10 +303,10 @@ class WordFormatterGUI:
                 sys.stdout = old_stdout
                 
             self.log_message("\n🎉 處理完成！")
-            self.log_message("處理後的文件已儲存在各自的 'successed' 資料夾中。")
+            self.log_message("處理後的文件已儲存在各自的 'success' 資料夾中。")
             
             # 顯示完成對話框
-            self.root.after(0, lambda: messagebox.showinfo("完成", "文件處理完成！\n\n處理後的文件已儲存在 'successed' 資料夾中。"))
+            self.root.after(0, lambda: messagebox.showinfo("完成", "文件處理完成！\n\n處理後的文件已儲存在 'success' 資料夾中。"))
             
         except Exception as e:
             self.log_message(f"處理過程中發生錯誤: {str(e)}")
