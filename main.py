@@ -292,9 +292,12 @@ def format_and_calc_table(doc_path):
             print(f"  Attempting PDF conversion...")
             convert(docx_abs_path, pdf_abs_path)
             
-            # 驗證 PDF 是否成功創建
+            # Verify PDF was created and force memory cleanup
             if os.path.exists(pdf_abs_path) and os.path.getsize(pdf_abs_path) > 0:
                 print(f"✓ Converted to PDF as {pdf_outname}")
+                # Force cleanup of PDF conversion resources
+                import gc
+                gc.collect()
             else:
                 raise Exception("PDF file was not created or is empty")
                 
@@ -360,20 +363,58 @@ def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
         
         print(f"Found {len(docx_files)} Word files")
         
-        for docx_file in docx_files:
-            # Skip already formatted files
-            if os.path.basename(docx_file).startswith('unused_'): # if you want to skip files that have been processed
-                print(f"Skipping already formatted file: {docx_file}")
-                continue
-                
-            try:
-                print(f"Processing file: {docx_file}")
-                docx_output, pdf_output = format_and_calc_table(docx_file)
-                processed_files.append({'docx': docx_output, 'pdf': pdf_output})
-                print(f"✓ Successfully processed: {docx_file}")
-            except Exception as e:
-                print(f"✗ Processing failed: {docx_file} - Error: {str(e)}")
-                failed_files.append(docx_file)
+        # Memory management: Process files in batches
+        batch_size = 5  # Process 5 files at a time to manage memory
+        total_files = len(docx_files)
+        
+        for i in range(0, total_files, batch_size):
+            batch_files = docx_files[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_files + batch_size - 1) // batch_size
+            
+            print(f"\n--- Processing Batch {batch_num}/{total_batches} ({len(batch_files)} files) ---")
+            
+            for docx_file in batch_files:
+                # Skip already formatted files
+                if os.path.basename(docx_file).startswith('unused_'): # if you want to skip files that have been processed
+                    print(f"Skipping already formatted file: {docx_file}")
+                    continue
+                    
+                try:
+                    print(f"Processing file ({i + batch_files.index(docx_file) + 1}/{total_files}): {os.path.basename(docx_file)}")
+                    docx_output, pdf_output = format_and_calc_table(docx_file)
+                    processed_files.append({'docx': docx_output, 'pdf': pdf_output})
+                    print(f"✓ Successfully processed: {os.path.basename(docx_file)}")
+                    
+                    # Show completion summary for this file
+                    pdf_status = "✓ PDF generated" if pdf_output else "⚠ PDF failed"
+                    print(f"  → Word: ✓ | PDF: {pdf_status}")
+                    
+                    # Memory cleanup after each file
+                    import gc
+                    gc.collect()
+                    
+                except Exception as e:
+                    print(f"✗ Processing failed: {os.path.basename(docx_file)} - Error: {str(e)}")
+                    failed_files.append(docx_file)
+            
+            # Memory cleanup after each batch
+            import gc
+            gc.collect()
+            
+            # Show batch completion summary
+            batch_successful = len([f for f in processed_files[-len(batch_files):] if f['docx']])
+            batch_failed_count = len(batch_files) - batch_successful
+            print(f"\n📊 Batch {batch_num} Summary:")
+            print(f"   ✓ Successfully processed: {batch_successful} files")
+            if batch_failed_count > 0:
+                print(f"   ✗ Failed: {batch_failed_count} files")
+            
+            # Small pause between batches to allow system recovery
+            if batch_num < total_batches:  # Don't pause after the last batch
+                print(f"Batch {batch_num} completed. Pausing for memory cleanup...")
+                import time
+                time.sleep(1)  # 1 second pause
     
     else:
         print(f"Error: Path does not exist - {input_path}")
@@ -381,24 +422,28 @@ def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
     
     # Show processing results summary
     print("\n" + "="*50)
-    print("Processing Results Summary:")
+    print("🎉 Processing Results Summary:")
     print(f"Successfully processed: {len(processed_files)} files")
     print(f"Processing failed: {len(failed_files)} files")
     
+    # Calculate PDF success rate
+    pdf_successful = len([f for f in processed_files if f['pdf']])
     if processed_files:
-        print("\nSuccessfully processed files:")
-        for file_pair in processed_files:
-            print(f"  Word: {file_pair['docx']}")
-            if file_pair['pdf']:
-                print(f"  PDF:  {file_pair['pdf']}")
-            else:
-                print(f"  PDF:  (not generated)")
-            print()
+        pdf_success_rate = (pdf_successful / len(processed_files)) * 100
+        print(f"PDF conversion success rate: {pdf_success_rate:.1f}% ({pdf_successful}/{len(processed_files)})")
+    
+    if processed_files:
+        print("\n📁 Successfully processed files:")
+        for i, file_pair in enumerate(processed_files, 1):
+            filename = os.path.basename(file_pair['docx'])
+            pdf_icon = "📄" if file_pair['pdf'] else "❌"
+            print(f"  {i:2d}. {filename}")
+            print(f"      Word: ✓ | PDF: {pdf_icon}")
     
     if failed_files:
-        print("\nFailed to process files:")
-        for file in failed_files:
-            print(f"  - {file}")
+        print(f"\n❌ Failed to process files ({len(failed_files)}):")
+        for i, file in enumerate(failed_files, 1):
+            print(f"  {i:2d}. {os.path.basename(file)}")
 
 def main():
     """Main function - handle command line arguments"""
