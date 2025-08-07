@@ -1,11 +1,18 @@
+"""
+Miki Word Document Formatter
+自動為 Word 文件中的表格添加總計行並轉換為PDF
+"""
+
+import os
+import sys
+import glob
+import time
+import gc
+import argparse
 from docx import Document
 from datetime import timedelta
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
-import os
-import glob
-import argparse
-import sys
 
 # 嘗試導入 PDF 轉換模組
 try:
@@ -104,6 +111,27 @@ def highlight_table_yellow(tbl):
             break
     if service_idx is not None and tbl.rows[-1].cells[service_idx].text.strip() == 'Total':
         return  # Already has Total row, skip adding
+
+    # Remove empty rows from the end before adding Total row
+    rows_to_remove = []
+    for i in range(len(tbl.rows) - 1, 0, -1):  # Start from last row, skip header row
+        row = tbl.rows[i]
+        is_empty_row = True
+        for cell in row.cells:
+            if cell.text.strip():  # If any cell has content
+                is_empty_row = False
+                break
+        if is_empty_row:
+            rows_to_remove.append(i)
+        else:
+            break  # Stop when we find a non-empty row
+    
+    # Remove empty rows (from bottom to top to maintain indices)
+    for row_idx in rows_to_remove:
+        # Remove the row from the table
+        row_element = tbl.rows[row_idx]._element
+        row_element.getparent().remove(row_element)
+        print(f"  Removed empty row at index {row_idx}")
 
     # Prepare for summation
     purchased_sum = 0
@@ -492,7 +520,7 @@ if __name__ == "__main__":
             if os.path.isdir(input_path):
                 choice = input("Search subdirectories recursively? (y/n, default y): ").strip().lower()
                 if choice in ['n', 'no']:
-                    recursive = False
+                    recursive = Falserecursive = False
             
             print()
             batch_process_documents(input_path, recursive)

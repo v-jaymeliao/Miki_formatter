@@ -1,6 +1,6 @@
 @echo off
 echo =================================================
-echo    Miki Word Document Formatter - Build Script
+echo    Miki Word Document Formatter - Enhanced Build
 echo =================================================
 echo.
 
@@ -14,29 +14,46 @@ if errorlevel 1 (
 )
 echo.
 
-echo Installing build tools...
-pip install pyinstaller python-docx docx2pdf
+echo Installing/Updating all dependencies...
+pip install --upgrade pyinstaller python-docx docx2pdf lxml
+pip install --upgrade pywin32 tqdm colorama
 echo.
 
 echo Cleaning old files...
-if exist "dist" rmdir /s /q dist
-if exist "build" rmdir /s /q build
+if exist "dist\MikiFormatter.exe" (
+    echo Attempting to remove old executable...
+    del /f "dist\MikiFormatter.exe" 2>nul
+    timeout /t 2 >nul
+)
+if exist "dist" rmdir /s /q dist 2>nul
+if exist "build" rmdir /s /q build 2>nul
 echo.
 
-echo Starting build process...
-pyinstaller MikiFormatter.spec
+echo Generating pywin32 cache...
+python -c "import win32com.client; win32com.client.gencache.EnsureDispatch('Word.Application')" 2>nul
+echo.
+
+echo Starting enhanced build process...
+pyinstaller --clean MikiFormatter.spec
 
 echo.
 if exist "dist\MikiFormatter.exe" (
-    echo ^> Success! Executable file created: dist\MikiFormatter.exe
+    echo ^> Success! Enhanced executable file created: dist\MikiFormatter.exe
     echo.
     echo File size: 
     for %%I in ("dist\MikiFormatter.exe") do echo %%~zI bytes
     echo.
     echo Testing execution...
-    start "Test" "dist\MikiFormatter.exe"
+    echo Starting test with console enabled for debugging...
+    start "Test MikiFormatter" "dist\MikiFormatter.exe"
 ) else (
-    echo ^> Build failed!
+    echo ^> Enhanced build failed!
+    echo Checking build logs...
+    if exist "build\MikiFormatter\warn-MikiFormatter.txt" (
+        echo.
+        echo Build warnings:
+        type "build\MikiFormatter\warn-MikiFormatter.txt"
+    )
 )
 echo.
 pause

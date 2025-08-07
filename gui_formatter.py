@@ -1,22 +1,27 @@
+"""
+Miki Word Document Formatter GUI
+圖形界面版本的Word文件格式化工具 - 簡化版
+"""
+
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
+import sys
 import threading
+from io import StringIO
 from main import batch_process_documents
 
 class WordFormatterGUI:
-    VERSION = "1.0.1"  # 版本號
-    
     def __init__(self, root):
         self.root = root
-        self.root.title(f"Miki Word 文件格式化工具 v{self.VERSION}")
-        self.root.geometry("800x700")  # 更合適的初始大小
-        self.root.minsize(600, 500)    # 設置最小尺寸
+        self.root.title("Miki Word 文件格式化工具 v1.0")
+        self.root.geometry("1000x700")
+        self.root.minsize(800, 600)
         self.root.resizable(True, True)
         
         # 設置圖標和樣式
         try:
-            self.root.iconbitmap(default='')  # 可以添加圖標
+            self.root.iconbitmap(default='')
         except:
             pass
         
@@ -276,15 +281,14 @@ class WordFormatterGUI:
     
     def show_welcome_message(self):
         """顯示歡迎訊息"""
-        # 檢查 PDF 功能是否可用
+        # 檢查PDF功能是否可用
         try:
             from docx2pdf import convert
-            pdf_status = "✅ PDF 轉換功能已啟用"
+            pdf_status = "✅ Word 轉 PDF 功能已啟用"
         except ImportError:
-            pdf_status = "⚠️ PDF 轉換功能未啟用 (需要安裝 docx2pdf)"
+            pdf_status = "❌ PDF 轉換功能未啟用 (缺少 docx2pdf)"
             
-        welcome_msg = f"""
-🎉 歡迎使用 Miki Word 文件格式化工具！
+        welcome_msg = f"""🎉 歡迎使用 Miki Word 文件格式化工具！
 
 功能：
 ✅ 自動為 Word 表格添加總計行
