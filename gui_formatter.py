@@ -5,9 +5,11 @@ import threading
 from main import batch_process_documents
 
 class WordFormatterGUI:
+    VERSION = "1.0.0"  # 版本號
+    
     def __init__(self, root):
         self.root = root
-        self.root.title("Miki Word 文件格式化工具")
+        self.root.title(f"Miki Word 文件格式化工具 v{self.VERSION}")
         self.root.geometry("800x700")  # 更合適的初始大小
         self.root.minsize(600, 500)    # 設置最小尺寸
         self.root.resizable(True, True)
