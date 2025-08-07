@@ -1,43 +1,43 @@
 @echo off
-title Miki Word 文件格式化工具
+title Miki Word Document Formatter
 echo.
 echo ========================================
-echo    Miki Word 文件格式化工具
+echo    Miki Word Document Formatter
 echo ========================================
 echo.
-echo 正在啟動圖形界面...
+echo Starting GUI interface...
 echo.
 
-REM 檢查 Python 是否安裝
+REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo 錯誤: 找不到 Python 程式！
-    echo 請確保已安裝 Python 並加入系統路徑。
+    echo Error: Python not found!
+    echo Please make sure Python is installed and added to system PATH.
     echo.
     pause
     exit /b 1
 )
 
-REM 檢查依賴是否安裝
+REM Check if dependencies are installed
 python -c "import docx" >nul 2>&1
 if errorlevel 1 (
-    echo 正在安裝必要套件...
+    echo Installing required packages...
     pip install python-docx
     if errorlevel 1 (
-        echo 套件安裝失敗！請聯繫技術支援。
+        echo Package installation failed! Please contact technical support.
         pause
         exit /b 1
     )
 )
 
-REM 啟動 GUI
+REM Start GUI
 python gui_formatter.py
 
-REM 如果程式異常結束，顯示錯誤訊息
+REM If program exits with error, show error message
 if errorlevel 1 (
     echo.
-    echo 程式執行時發生錯誤！
-    echo 請聯繫技術支援或查看錯誤訊息。
+    echo Program encountered an error during execution!
+    echo Please contact technical support or check error messages.
     echo.
     pause
 )

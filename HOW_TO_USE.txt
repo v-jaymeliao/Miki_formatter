@@ -1,0 +1,18 @@
+Miki Word Document Formatter v1.0
+
+HOW TO USE:
+1. Double-click MikiFormatter.exe
+2. Click "Select File" or "Select Folder" 
+3. Click "Start Processing"
+4. Done! Check the "success_pdf" and "success_docx" folder for results
+
+WHAT IT DOES:
+- Adds total rows to Word tables
+- Works with tables containing: Package, Service, Type, Purchased, Used, Remaining, Trend
+- Original files are not modified
+
+SYSTEM REQUIREMENTS:
+- Windows (any version)
+- No additional software needed
+
+If you have problems, contact technical support.

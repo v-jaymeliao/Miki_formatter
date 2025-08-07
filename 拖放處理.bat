@@ -1,44 +1,44 @@
 @echo off
-title Miki Word 文件格式化工具 - 拖放處理器
+title Miki Word Document Formatter - Drag & Drop Handler
 echo.
 echo ========================================
-echo    Miki Word 文件格式化工具
+echo    Miki Word Document Formatter
 echo ========================================
 echo.
 
 if "%~1"=="" (
-    echo 使用方法:
-    echo 1. 將 Word 文件或包含 Word 文件的資料夾拖放到此批處理文件上
-    echo 2. 或者雙擊此文件然後輸入路徑
+    echo Usage:
+    echo 1. Drag Word files or folders containing Word files onto this batch file
+    echo 2. Or double-click this file and enter the path
     echo.
-    set /p "input_path=請輸入要處理的文件或資料夾路徑: "
+    set /p "input_path=Please enter the file or folder path to process: "
 ) else (
     set "input_path=%~1"
-    echo 處理拖放的路徑: %input_path%
+    echo Processing dragged path: %input_path%
 )
 
 echo.
-echo 正在處理...
+echo Processing...
 echo.
 
-REM 檢查 Python
+REM Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo 錯誤: 找不到 Python！
+    echo Error: Python not found!
     pause
     exit /b 1
 )
 
-REM 檢查依賴
+REM Check dependencies
 python -c "import docx" >nul 2>&1
 if errorlevel 1 (
-    echo 正在安裝必要套件...
+    echo Installing required packages...
     pip install python-docx
 )
 
-REM 處理文件
+REM Process files
 python main.py "%input_path%"
 
 echo.
-echo 處理完成！按任意鍵關閉視窗。
+echo Processing complete! Press any key to close window.
 pause >nul

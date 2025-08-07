@@ -1,87 +1,93 @@
-# Miki Word 文件格式化工具
+# 📊 Miki Word Document Formatter
 
-這個工具可以批量處理 Word 文件，為表格添加總計行並格式化。
+> **Professional Word document table formatter with GUI interface**
 
-## 使用方法
+## ✨ Features
 
-### 1. 命令行模式
+- 🖥️ **User-friendly GUI** - No technical knowledge required
+- 📁 **Batch Processing** - Handle multiple files or entire folders
+- 🎯 **Smart Table Detection** - Automatically finds and formats target tables
+- 💾 **Safe Processing** - Original files remain untouched
+- 🚀 **One-Click Operation** - Just select files and click process
 
-#### 基本用法：
-```bash
-python main.py <文件或目錄路徑>
+## 🎯 What It Does
+
+Automatically adds **Total** rows to Word tables containing these columns:
+- Package, Service, Type, Purchased, Used, Remaining, Trend
+
+**Output formats:**
+- **Word files** (.docx) - Saved in `success_docx` folder
+- **PDF files** (.pdf) - Saved in `success_pdf` folder
+- Total rows highlighted with **yellow background** for better visibility
+
+## 📥 Download
+
+**[Download MikiFormatter.exe](https://github.com/v-jaymeliao/Miki_formatter/releases/latest)**
+
+## 🚀 Quick Start
+
+### Method 1: GUI Interface (Recommended)
+1. Double-click `MikiFormatter.exe` to launch the APP with GUI
+2. Click "📄 Select Single Word File" or "📁 Select Folder"
+3. Choose your files or folders
+4. Click "🚀 Start Processing"
+5. Find results in the "success_docx" folder (Word files) and "success_pdf" folder (PDF files)
+
+### Method 2: Drag & Drop (Console App without GUI)
+1. Drag Word files or folders directly onto `拖放處理.bat`
+2. Processing starts automatically
+3. Wait for completion
+
+## 💻 System Requirements
+
+- Windows 7/8/10/11
+- Microsoft Word (required for PDF conversion)
+- Sufficient disk space (stores both Word and PDF formats)
+
+## 📋 Usage Examples
+
+### Single File
+```
+Original: report.docx
+Results: 
+├── success_docx/report.docx  (Word format)
+└── success_pdf/report.pdf    (PDF format)
 ```
 
-#### 選項：
-- `--no-recursive`: 不遞歸搜索子目錄
-- `--pattern <模式>`: 指定文件過濾模式（默認: *.docx）
-
-#### 範例：
-```bash
-# 處理單個文件
-python main.py "report.docx"
-
-# 處理整個目錄（包含子目錄）
-python main.py "C:\Reports"
-
-# 處理目錄但不包含子目錄
-python main.py "C:\Reports" --no-recursive
-
-# 處理特定模式的文件
-python main.py "C:\Reports" --pattern "*report*.docx"
+### Batch Processing
+```
+Input Folder: C:\Reports\
+Output: 
+├── C:\Reports\success_docx\
+│   ├── report1.docx
+│   ├── report2.docx
+│   └── report3.docx
+└── C:\Reports\success_pdf\
+    ├── report1.pdf
+    ├── report2.pdf
+    └── report3.pdf
 ```
 
-### 2. 交互式模式
+## ⚠️ Important Notes
 
-直接運行程序，不提供參數：
-```bash
-python main.py
-```
+- **Original files remain untouched** - All processing creates new files
+- **Both formats generated** - Word (.docx) and PDF (.pdf) files are created
+- **Total rows highlighted** - Yellow background makes totals stand out
+- **Ensure Word files are closed** before processing
+- **Large batches** - Tool processes in batches of 10 files to prevent memory issues
+- **File format** - Only .docx files are supported
 
-程序會提示你輸入文件或目錄路徑，並詢問是否遞歸搜索。
+## 🆘 Support
 
-### 3. GUI 模式
+- 📖 [User Guide (English)](HOW_TO_USE.txt)
+- 📖 [使用說明 (中文)](使用說明.md) - Detailed Chinese guide
+- 🐛 [Report Issues](https://github.com/v-jaymeliao/Miki_formatter/issues)
+- 📧 Contact: Technical Support Team
 
-運行圖形界面版本：
-```bash
-python gui_formatter.py
-```
+## 📄 License
 
-GUI 提供以下功能：
-- 選擇單個文件或目錄
-- 設置是否遞歸搜索
-- 自定義文件過濾模式
-- 實時查看處理日誌
-- 進度指示
+MIT License - Free to use, modify, and distribute.
 
-## 功能特點
+---
 
-1. **批量處理**: 可以處理單個文件或整個目錄樹
-2. **智能過濾**: 自動跳過已經處理過的文件（以 "Formatted_" 開頭）
-3. **錯誤處理**: 即使某個文件處理失敗，也會繼續處理其他文件
-4. **詳細日誌**: 顯示處理進度和結果摘要
-5. **格式保持**: 保持原始表格的格式和對齊方式
-
-## 輸出
-
-- 處理後的文件會以 "Formatted_" 前綴保存
-- 原始文件保持不變
-- 處理結果會顯示成功和失敗的文件清單
-
-## 系統要求
-
-- Python 3.6+
-- python-docx 庫
-- tkinter（GUI 版本需要，通常 Python 自帶）
-
-## 安裝依賴
-
-```bash
-pip install python-docx
-```
-
-## 注意事項
-
-1. 確保 Word 文件沒有被其他程序打開
-2. 處理大量文件時可能需要一些時間
-3. 建議先在少量文件上測試
-4. 程序會自動跳過非 .docx 文件
+⭐ **Found this helpful? Please star the repository!**

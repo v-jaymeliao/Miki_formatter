@@ -1,11 +1,27 @@
+"""
+Miki Word Document Formatter
+自動為 Word 文件中的表格添加總計行並轉換為PDF
+"""
+
+import os
+import sys
+import glob
+import time
+import gc
+import argparse
 from docx import Document
 from datetime import timedelta
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls
-import os
-import glob
-import argparse
-import sys
+
+# 嘗試導入 PDF 轉換模組
+try:
+    from docx2pdf import convert
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    print("Warning: docx2pdf not available. Only Word files will be generated.")
+    print("To enable PDF conversion, run: pip install docx2pdf")
 
 # Function to convert time format [h]:mm to minutes
 def time_to_minutes(time_str):
@@ -78,25 +94,46 @@ def edit_word_table(doc_path):
 
 
 def highlight_table_yellow(tbl):
-    # Test: 先標記顏色
+    # Test: Mark with color first
     # for row in tbl.rows:
     #     for cell in row.cells:
     #         cell._element.get_or_add_tcPr().append(
     #             parse_xml(r'<w:shd {} w:fill="FFFF00"/>'.format(nsdecls('w')))
     #         )
-    # 取得欄位索引
+    # Get column indices
     headers = [cell.text.strip() for cell in tbl.rows[0].cells]
     col_count = len(headers)
-    # 檢查最後一列 Service 欄是否已經是 Total:
+    # Check if the last row's Service column already has 'Total'
     service_idx = None
     for idx, h in enumerate(headers):
         if h == 'Service':
             service_idx = idx
             break
-    if service_idx is not None and tbl.rows[-1].cells[service_idx].text.strip() == 'Total:':
-        return  # 已經有 Total: 就不再新增
+    if service_idx is not None and tbl.rows[-1].cells[service_idx].text.strip() == 'Total':
+        return  # Already has Total row, skip adding
 
-    # 準備加總用
+    # Remove empty rows from the end before adding Total row
+    rows_to_remove = []
+    for i in range(len(tbl.rows) - 1, 0, -1):  # Start from last row, skip header row
+        row = tbl.rows[i]
+        is_empty_row = True
+        for cell in row.cells:
+            if cell.text.strip():  # If any cell has content
+                is_empty_row = False
+                break
+        if is_empty_row:
+            rows_to_remove.append(i)
+        else:
+            break  # Stop when we find a non-empty row
+    
+    # Remove empty rows (from bottom to top to maintain indices)
+    for row_idx in rows_to_remove:
+        # Remove the row from the table
+        row_element = tbl.rows[row_idx]._element
+        row_element.getparent().remove(row_element)
+        print(f"  Removed empty row at index {row_idx}")
+
+    # Prepare for summation
     purchased_sum = 0
     used_sum = 0
     remaining_sum = 0
@@ -112,7 +149,7 @@ def highlight_table_yellow(tbl):
             trend_idx = idx
         if h == 'Service':
             service_idx = idx
-    # 加總 purchased, used, remaining
+    # Sum up purchased, used, remaining
     for row in tbl.rows[1:]:
         if purchased_idx is not None:
             val = row.cells[purchased_idx].text.strip()
@@ -137,20 +174,20 @@ def highlight_table_yellow(tbl):
                     remaining_sum += h*60 + m
                 except:
                     pass
-    # 新增一列，只填指定欄位
+    # Add a new row, fill only specified columns
     new_row = tbl.add_row()
     
-    # 取得上一行的格式作為參考
-    last_data_row = tbl.rows[-2]  # 新增行之前的最後一行
+    # Get the previous row's format as reference
+    last_data_row = tbl.rows[-2]  # The last row before the new one
     
     for idx in range(col_count):
         header = headers[idx]
         cell = new_row.cells[idx]
         reference_cell = last_data_row.cells[idx]
         
-        # 複製格式屬性
+        # Copy format properties
         if reference_cell._element.find('.//w:rPr', reference_cell._element.nsmap) is not None:
-            # 複製字體格式
+            # Copy font format
             for paragraph in cell.paragraphs:
                 for run in paragraph.runs:
                     if reference_cell.paragraphs and reference_cell.paragraphs[0].runs:
@@ -164,15 +201,15 @@ def highlight_table_yellow(tbl):
                         if ref_run.italic is not None:
                             run.italic = ref_run.italic
         
-        # 複製段落對齊方式
+        # Copy paragraph alignment
         if reference_cell.paragraphs and cell.paragraphs:
             if reference_cell.paragraphs[0].alignment is not None:
                 cell.paragraphs[0].alignment = reference_cell.paragraphs[0].alignment
         
-        # 設置內容
+        # Set content
         content = ''
         if header == 'Service':
-            content = ' Total:'
+            content = ' Total'
         elif header == 'Type':
             content = ' Hour'
         elif header == 'Purchased':
@@ -193,18 +230,18 @@ def highlight_table_yellow(tbl):
         else:
             content = ''
         
-        # 清空現有內容並重新創建
+        # Clear existing content and recreate
         cell.text = ''
         paragraph = cell.paragraphs[0]
         
-        # 複製對齊方式
+        # Copy alignment
         if reference_cell.paragraphs and reference_cell.paragraphs[0].alignment is not None:
             paragraph.alignment = reference_cell.paragraphs[0].alignment
         
-        # 添加新的run並設置格式
+        # Add new run and set format
         run = paragraph.add_run(content)
         
-        # 複製字體格式
+        # Copy font format
         if reference_cell.paragraphs and reference_cell.paragraphs[0].runs:
             ref_run = reference_cell.paragraphs[0].runs[0]
             if ref_run.font.name:
@@ -215,6 +252,12 @@ def highlight_table_yellow(tbl):
                 run.bold = ref_run.bold
             if ref_run.italic is not None:
                 run.italic = ref_run.italic
+        
+        # Add yellow background only to cells with content (from "Total" onwards)
+        if content.strip():  # Only apply yellow background if cell has content
+            cell._element.get_or_add_tcPr().append(
+                parse_xml(r'<w:shd {} w:fill="FFFF00"/>'.format(nsdecls('w')))
+            )
 
 def format_and_calc_table(doc_path):
     doc = Document(doc_path)
@@ -226,153 +269,258 @@ def format_and_calc_table(doc_path):
                 headers = [cell.text.strip() for cell in tbl.rows[0].cells]
                 if headers == target_headers:
                     highlight_table_yellow(tbl)
-            # 遞迴搜尋巢狀表格
+            # Recursively search nested tables
             for row in tbl.rows:
                 for cell in row.cells:
                     if cell.tables:
                         recursive_search(cell.tables)
     recursive_search(doc.tables)
     
-    # 在原文件的同一目錄下創建 successed 子目錄
+    # Create success subdirectories in the same directory as the original file
     dir_path = os.path.dirname(doc_path)
-    successed_dir = os.path.join(dir_path, "successed")
+    success_docx_dir = os.path.join(dir_path, "success_docx")
+    success_pdf_dir = os.path.join(dir_path, "success_pdf")
     
-    # 確保 successed 目錄存在
-    if not os.path.exists(successed_dir):
-        os.makedirs(successed_dir)
-        print(f"創建目錄: {successed_dir}")
+    # Ensure success directories exist
+    if not os.path.exists(success_docx_dir):
+        os.makedirs(success_docx_dir)
+        print(f"Created directory: {success_docx_dir}")
+    
+    if not os.path.exists(success_pdf_dir):
+        os.makedirs(success_pdf_dir)
+        print(f"Created directory: {success_pdf_dir}")
     
     filename = os.path.basename(doc_path)
     name, ext = os.path.splitext(filename)
-    outname = os.path.join(successed_dir, f"Formatted_{name}{ext}")
     
-    doc.save(outname)
-    print(f"已格式化，並儲存為 {outname}")
-    return outname
+    # Save Word file
+    docx_outname = os.path.join(success_docx_dir, f"{name}{ext}")
+    doc.save(docx_outname)
+    print(f"Formatted and saved Word file as {docx_outname}")
+    
+    # Convert to PDF (if available)
+    pdf_outname = os.path.join(success_pdf_dir, f"{name}.pdf")
+    if PDF_AVAILABLE:
+        try:
+            # 檢查 Word 文件是否可讀取
+            if not os.path.exists(docx_outname):
+                raise FileNotFoundError(f"Word file not found: {docx_outname}")
+            
+            # 等待一下確保文件完全寫入磁盤
+            import time
+            time.sleep(0.5)
+            
+            # 嘗試 PDF 轉換，使用絕對路徑
+            docx_abs_path = os.path.abspath(docx_outname)
+            pdf_abs_path = os.path.abspath(pdf_outname)
+            
+            # 確保目標目錄存在
+            os.makedirs(os.path.dirname(pdf_abs_path), exist_ok=True)
+            
+            print(f"  Attempting PDF conversion...")
+            convert(docx_abs_path, pdf_abs_path)
+            
+            # Verify PDF was created and force memory cleanup
+            if os.path.exists(pdf_abs_path) and os.path.getsize(pdf_abs_path) > 0:
+                print(f"✓ Converted to PDF as {pdf_outname}")
+                # Force cleanup of PDF conversion resources
+                import gc
+                gc.collect()
+            else:
+                raise Exception("PDF file was not created or is empty")
+                
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Warning: PDF conversion failed for {docx_outname}")
+            print(f"  Reason: {error_msg}")
+            
+            # 提供更具體的建議
+            if "'NoneType' object has no attribute" in error_msg:
+                print(f"  This usually means Microsoft Word is not properly installed or accessible.")
+                print(f"  Try: 1) Ensure Microsoft Word is installed and licensed")
+                print(f"       2) Try running as administrator")
+                print(f"       3) Close any open Word documents")
+            elif "Access is denied" in error_msg:
+                print(f"  File access denied. Try running as administrator.")
+            else:
+                print(f"  You can manually open the Word file and save it as PDF")
+            pdf_outname = None
+    else:
+        print(f"PDF conversion skipped (docx2pdf not available)")
+        pdf_outname = None
+    
+    return docx_outname, pdf_outname
 
 def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
     """
-    批量處理 Word 文件
+    Batch process Word documents
     
     Args:
-        input_path: 可以是單個文件路徑或目錄路徑
-        recursive: 是否遞歸搜索子目錄
-        file_pattern: 文件過濾模式，默認是 *.docx
+        input_path: Can be a single file path or directory path
+        recursive: Whether to recursively search subdirectories
+        file_pattern: File filter pattern, default is *.docx
     """
     processed_files = []
     failed_files = []
     
-    # 檢查輸入路徑是文件還是目錄
+    # Check if input path is a file or directory
     if os.path.isfile(input_path):
-        # 單個文件處理
+        # Single file processing
         if input_path.lower().endswith('.docx'):
             try:
-                print(f"處理文件: {input_path}")
-                output_file = format_and_calc_table(input_path)
-                processed_files.append(output_file)
-                print(f"✓ 成功處理: {input_path}")
+                print(f"Processing file: {input_path}")
+                docx_output, pdf_output = format_and_calc_table(input_path)
+                processed_files.append({'docx': docx_output, 'pdf': pdf_output})
+                print(f"✓ Successfully processed: {input_path}")
             except Exception as e:
-                print(f"✗ 處理失敗: {input_path} - 錯誤: {str(e)}")
+                print(f"✗ Processing failed: {input_path} - Error: {str(e)}")
                 failed_files.append(input_path)
         else:
-            print(f"跳過非 Word 文件: {input_path}")
+            print(f"Skipping non-Word file: {input_path}")
     
     elif os.path.isdir(input_path):
-        # 目錄處理
+        # Directory processing
         if recursive:
-            # 遞歸搜索所有子目錄
+            # Recursively search all subdirectories
             pattern = os.path.join(input_path, "**", file_pattern)
             docx_files = glob.glob(pattern, recursive=True)
         else:
-            # 只搜索當前目錄
+            # Search current directory only
             pattern = os.path.join(input_path, file_pattern)
             docx_files = glob.glob(pattern)
         
-        print(f"找到 {len(docx_files)} 個 Word 文件")
+        print(f"Found {len(docx_files)} Word files")
         
-        for docx_file in docx_files:
-            # 跳過已經格式化的文件
-            if os.path.basename(docx_file).startswith('Formatted_'):
-                print(f"跳過已格式化的文件: {docx_file}")
-                continue
-                
-            try:
-                print(f"處理文件: {docx_file}")
-                output_file = format_and_calc_table(docx_file)
-                processed_files.append(output_file)
-                print(f"✓ 成功處理: {docx_file}")
-            except Exception as e:
-                print(f"✗ 處理失敗: {docx_file} - 錯誤: {str(e)}")
-                failed_files.append(docx_file)
+        # Memory management: Process files in batches
+        batch_size = 5  # Process 5 files at a time to manage memory
+        total_files = len(docx_files)
+        
+        for i in range(0, total_files, batch_size):
+            batch_files = docx_files[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_files + batch_size - 1) // batch_size
+            
+            print(f"\n--- Processing Batch {batch_num}/{total_batches} ({len(batch_files)} files) ---")
+            
+            for docx_file in batch_files:
+                # Skip already formatted files
+                if os.path.basename(docx_file).startswith('unused_'): # if you want to skip files that have been processed
+                    print(f"Skipping already formatted file: {docx_file}")
+                    continue
+                    
+                try:
+                    print(f"Processing file ({i + batch_files.index(docx_file) + 1}/{total_files}): {os.path.basename(docx_file)}")
+                    docx_output, pdf_output = format_and_calc_table(docx_file)
+                    processed_files.append({'docx': docx_output, 'pdf': pdf_output})
+                    print(f"✓ Successfully processed: {os.path.basename(docx_file)}")
+                    
+                    # Show completion summary for this file
+                    pdf_status = "✓ PDF generated" if pdf_output else "⚠ PDF failed"
+                    print(f"  → Word: ✓ | PDF: {pdf_status}")
+                    
+                    # Memory cleanup after each file
+                    import gc
+                    gc.collect()
+                    
+                except Exception as e:
+                    print(f"✗ Processing failed: {os.path.basename(docx_file)} - Error: {str(e)}")
+                    failed_files.append(docx_file)
+            
+            # Memory cleanup after each batch
+            import gc
+            gc.collect()
+            
+            # Show batch completion summary
+            batch_successful = len([f for f in processed_files[-len(batch_files):] if f['docx']])
+            batch_failed_count = len(batch_files) - batch_successful
+            print(f"\n📊 Batch {batch_num} Summary:")
+            print(f"   ✓ Successfully processed: {batch_successful} files")
+            if batch_failed_count > 0:
+                print(f"   ✗ Failed: {batch_failed_count} files")
+            
+            # Small pause between batches to allow system recovery
+            if batch_num < total_batches:  # Don't pause after the last batch
+                print(f"Batch {batch_num} completed. Pausing for memory cleanup...")
+                import time
+                time.sleep(1)  # 1 second pause
     
     else:
-        print(f"錯誤: 路徑不存在 - {input_path}")
+        print(f"Error: Path does not exist - {input_path}")
         return
     
-    # 顯示處理結果摘要
+    # Show processing results summary
     print("\n" + "="*50)
-    print("處理結果摘要:")
-    print(f"成功處理: {len(processed_files)} 個文件")
-    print(f"處理失敗: {len(failed_files)} 個文件")
+    print("🎉 Processing Results Summary:")
+    print(f"Successfully processed: {len(processed_files)} files")
+    print(f"Processing failed: {len(failed_files)} files")
+    
+    # Calculate PDF success rate
+    pdf_successful = len([f for f in processed_files if f['pdf']])
+    if processed_files:
+        pdf_success_rate = (pdf_successful / len(processed_files)) * 100
+        print(f"PDF conversion success rate: {pdf_success_rate:.1f}% ({pdf_successful}/{len(processed_files)})")
     
     if processed_files:
-        print("\n成功處理的文件:")
-        for file in processed_files:
-            print(f"  - {file}")
+        print("\n📁 Successfully processed files:")
+        for i, file_pair in enumerate(processed_files, 1):
+            filename = os.path.basename(file_pair['docx'])
+            pdf_icon = "📄" if file_pair['pdf'] else "❌"
+            print(f"  {i:2d}. {filename}")
+            print(f"      Word: ✓ | PDF: {pdf_icon}")
     
     if failed_files:
-        print("\n處理失敗的文件:")
-        for file in failed_files:
-            print(f"  - {file}")
+        print(f"\n❌ Failed to process files ({len(failed_files)}):")
+        for i, file in enumerate(failed_files, 1):
+            print(f"  {i:2d}. {os.path.basename(file)}")
 
 def main():
-    """主函數 - 處理命令行參數"""
-    parser = argparse.ArgumentParser(description='批量格式化 Word 文件中的表格')
-    parser.add_argument('input', help='輸入文件或目錄路徑')
+    """Main function - handle command line arguments"""
+    parser = argparse.ArgumentParser(description='Batch format tables in Word documents')
+    parser.add_argument('input', help='Input file or directory path')
     parser.add_argument('--no-recursive', action='store_true', 
-                       help='不遞歸搜索子目錄（僅在輸入為目錄時有效）')
+                       help='Do not recursively search subdirectories (only effective when input is directory)')
     parser.add_argument('--pattern', default='*.docx', 
-                       help='文件過濾模式（默認: *.docx）')
+                       help='File filter pattern (default: *.docx)')
     
     args = parser.parse_args()
     
     if not os.path.exists(args.input):
-        print(f"錯誤: 路徑不存在 - {args.input}")
+        print(f"Error: Path does not exist - {args.input}")
         sys.exit(1)
     
     recursive = not args.no_recursive
     
-    print("Miki Word 文件格式化工具")
+    print("Miki Word Document Formatter")
     print("="*30)
-    print(f"輸入路徑: {args.input}")
-    print(f"遞歸搜索: {'是' if recursive else '否'}")
-    print(f"文件模式: {args.pattern}")
+    print(f"Input path: {args.input}")
+    print(f"Recursive search: {'Yes' if recursive else 'No'}")
+    print(f"File pattern: {args.pattern}")
     print()
     
     batch_process_documents(args.input, recursive, args.pattern)
 
 if __name__ == "__main__":
-    # 如果沒有命令行參數，提供交互式模式
+    # If no command line arguments, provide interactive mode
     if len(sys.argv) == 1:
-        print("Miki Word 文件格式化工具 - 交互式模式")
+        print("Miki Word Document Formatter - Interactive Mode")
         print("="*40)
         
         while True:
-            input_path = input("請輸入文件或目錄路徑 (輸入 'q' 退出): ").strip()
+            input_path = input("Please enter file or directory path (enter 'q' to exit): ").strip()
             
             if input_path.lower() == 'q':
                 break
                 
             if not os.path.exists(input_path):
-                print(f"錯誤: 路徑不存在 - {input_path}")
+                print(f"Error: Path does not exist - {input_path}")
                 continue
             
-            # 如果是目錄，詢問是否遞歸搜索
+            # If it's a directory, ask whether to search recursively
             recursive = True
             if os.path.isdir(input_path):
-                choice = input("是否遞歸搜索子目錄? (y/n, 默認 y): ").strip().lower()
+                choice = input("Search subdirectories recursively? (y/n, default y): ").strip().lower()
                 if choice in ['n', 'no']:
-                    recursive = False
+                    recursive = Falserecursive = False
             
             print()
             batch_process_documents(input_path, recursive)
