@@ -5,7 +5,7 @@ import threading
 from main import batch_process_documents
 
 class WordFormatterGUI:
-    VERSION = "1.0.0"  # 版本號
+    VERSION = "1.0.1"  # 版本號
     
     def __init__(self, root):
         self.root = root
@@ -65,7 +65,7 @@ class WordFormatterGUI:
             "1️⃣ 點擊下方按鈕選擇要處理的 Word 文件或整個資料夾",
             "2️⃣ 如果選擇資料夾，可以選擇是否搜尋子資料夾", 
             "3️⃣ 點擊「開始處理」按鈕",
-            "4️⃣ 處理完成的文件會自動儲存在原位置的 'success' 資料夾中"
+            "4️⃣ 處理完成的文件會自動儲存在對應的資料夾中"
         ]
         
         for instruction in instructions:
@@ -210,13 +210,21 @@ class WordFormatterGUI:
     
     def show_welcome_message(self):
         """顯示歡迎訊息"""
-        welcome_msg = """
+        # 檢查 PDF 功能是否可用
+        try:
+            from docx2pdf import convert
+            pdf_status = "✅ PDF 轉換功能已啟用"
+        except ImportError:
+            pdf_status = "⚠️ PDF 轉換功能未啟用 (需要安裝 docx2pdf)"
+            
+        welcome_msg = f"""
 🎉 歡迎使用 Miki Word 文件格式化工具！
 
 功能：
 ✅ 自動為 Word 表格添加總計行
 ✅ 批量處理多個文件
 ✅ 保持原始文件不變
+{pdf_status}
 
 快捷鍵：
 • Ctrl+O: 選擇文件
@@ -225,7 +233,7 @@ class WordFormatterGUI:
 • Ctrl+L: 清空日誌
 • F1: 顯示此說明
 
-處理後的文件會儲存在 'success' 資料夾中。
+處理後的文件會儲存在對應的資料夾中。
         """
         messagebox.showinfo("使用說明", welcome_msg)
             
@@ -305,10 +313,17 @@ class WordFormatterGUI:
                 sys.stdout = old_stdout
                 
             self.log_message("\n🎉 處理完成！")
-            self.log_message("處理後的文件已儲存在各自的 'success' 資料夾中。")
+            self.log_message("處理後的文件已儲存在對應的資料夾中。")
+            
+            # 檢查 PDF 功能狀態
+            try:
+                from docx2pdf import convert
+                completion_msg = "文件處理完成！\n\n處理後的文件已儲存在 'success_docx' 和 'success_pdf' 資料夾中。"
+            except ImportError:
+                completion_msg = "文件處理完成！\n\n處理後的 Word 文件已儲存在 'success_docx' 資料夾中。\n\n注意：PDF 轉換功能未啟用，僅生成了 Word 文件。"
             
             # 顯示完成對話框
-            self.root.after(0, lambda: messagebox.showinfo("完成", "文件處理完成！\n\n處理後的文件已儲存在 'success' 資料夾中。"))
+            self.root.after(0, lambda: messagebox.showinfo("完成", completion_msg))
             
         except Exception as e:
             self.log_message(f"處理過程中發生錯誤: {str(e)}")

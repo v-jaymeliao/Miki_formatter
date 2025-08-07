@@ -15,7 +15,7 @@ if errorlevel 1 (
 echo.
 
 echo Installing build tools...
-pip install pyinstaller python-docx
+pip install pyinstaller python-docx docx2pdf
 echo.
 
 echo Cleaning old files...
@@ -24,18 +24,7 @@ if exist "build" rmdir /s /q build
 echo.
 
 echo Starting build process...
-pyinstaller --onefile --windowed ^
-    --name "MikiFormatter" ^
-    --add-data "README.md;." ^
-    --hidden-import "tkinter" ^
-    --hidden-import "tkinter.ttk" ^
-    --hidden-import "tkinter.filedialog" ^
-    --hidden-import "tkinter.messagebox" ^
-    --hidden-import "docx" ^
-    --hidden-import "docx.oxml" ^
-    --hidden-import "docx.oxml.ns" ^
-    --hidden-import "threading" ^
-    gui_formatter.py
+pyinstaller MikiFormatter.spec
 
 echo.
 if exist "dist\MikiFormatter.exe" (

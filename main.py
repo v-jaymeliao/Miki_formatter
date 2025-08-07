@@ -7,6 +7,15 @@ import glob
 import argparse
 import sys
 
+# 嘗試導入 PDF 轉換模組
+try:
+    from docx2pdf import convert
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    print("Warning: docx2pdf not available. Only Word files will be generated.")
+    print("To enable PDF conversion, run: pip install docx2pdf")
+
 # Function to convert time format [h]:mm to minutes
 def time_to_minutes(time_str):
     if not time_str:
@@ -87,14 +96,14 @@ def highlight_table_yellow(tbl):
     # Get column indices
     headers = [cell.text.strip() for cell in tbl.rows[0].cells]
     col_count = len(headers)
-    # Check if the last row's Service column already has 'Total:'
+    # Check if the last row's Service column already has 'Total'
     service_idx = None
     for idx, h in enumerate(headers):
         if h == 'Service':
             service_idx = idx
             break
-    if service_idx is not None and tbl.rows[-1].cells[service_idx].text.strip() == 'Total:':
-        return  # Already has Total: row, skip adding
+    if service_idx is not None and tbl.rows[-1].cells[service_idx].text.strip() == 'Total':
+        return  # Already has Total row, skip adding
 
     # Prepare for summation
     purchased_sum = 0
@@ -172,7 +181,7 @@ def highlight_table_yellow(tbl):
         # Set content
         content = ''
         if header == 'Service':
-            content = ' Total:'
+            content = ' Total'
         elif header == 'Type':
             content = ' Hour'
         elif header == 'Purchased':
@@ -215,6 +224,12 @@ def highlight_table_yellow(tbl):
                 run.bold = ref_run.bold
             if ref_run.italic is not None:
                 run.italic = ref_run.italic
+        
+        # Add yellow background only to cells with content (from "Total" onwards)
+        if content.strip():  # Only apply yellow background if cell has content
+            cell._element.get_or_add_tcPr().append(
+                parse_xml(r'<w:shd {} w:fill="FFFF00"/>'.format(nsdecls('w')))
+            )
 
 def format_and_calc_table(doc_path):
     doc = Document(doc_path)
@@ -233,22 +248,77 @@ def format_and_calc_table(doc_path):
                         recursive_search(cell.tables)
     recursive_search(doc.tables)
     
-    # Create success subdirectory in the same directory as the original file
+    # Create success subdirectories in the same directory as the original file
     dir_path = os.path.dirname(doc_path)
-    success_dir = os.path.join(dir_path, "success")
+    success_docx_dir = os.path.join(dir_path, "success_docx")
+    success_pdf_dir = os.path.join(dir_path, "success_pdf")
     
-    # Ensure success directory exists
-    if not os.path.exists(success_dir):
-        os.makedirs(success_dir)
-        print(f"Created directory: {success_dir}")
+    # Ensure success directories exist
+    if not os.path.exists(success_docx_dir):
+        os.makedirs(success_docx_dir)
+        print(f"Created directory: {success_docx_dir}")
+    
+    if not os.path.exists(success_pdf_dir):
+        os.makedirs(success_pdf_dir)
+        print(f"Created directory: {success_pdf_dir}")
     
     filename = os.path.basename(doc_path)
     name, ext = os.path.splitext(filename)
-    outname = os.path.join(success_dir, f"Formatted_{name}{ext}")
     
-    doc.save(outname)
-    print(f"Formatted and saved as {outname}")
-    return outname
+    # Save Word file
+    docx_outname = os.path.join(success_docx_dir, f"{name}{ext}")
+    doc.save(docx_outname)
+    print(f"Formatted and saved Word file as {docx_outname}")
+    
+    # Convert to PDF (if available)
+    pdf_outname = os.path.join(success_pdf_dir, f"{name}.pdf")
+    if PDF_AVAILABLE:
+        try:
+            # 檢查 Word 文件是否可讀取
+            if not os.path.exists(docx_outname):
+                raise FileNotFoundError(f"Word file not found: {docx_outname}")
+            
+            # 等待一下確保文件完全寫入磁盤
+            import time
+            time.sleep(0.5)
+            
+            # 嘗試 PDF 轉換，使用絕對路徑
+            docx_abs_path = os.path.abspath(docx_outname)
+            pdf_abs_path = os.path.abspath(pdf_outname)
+            
+            # 確保目標目錄存在
+            os.makedirs(os.path.dirname(pdf_abs_path), exist_ok=True)
+            
+            print(f"  Attempting PDF conversion...")
+            convert(docx_abs_path, pdf_abs_path)
+            
+            # 驗證 PDF 是否成功創建
+            if os.path.exists(pdf_abs_path) and os.path.getsize(pdf_abs_path) > 0:
+                print(f"✓ Converted to PDF as {pdf_outname}")
+            else:
+                raise Exception("PDF file was not created or is empty")
+                
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Warning: PDF conversion failed for {docx_outname}")
+            print(f"  Reason: {error_msg}")
+            
+            # 提供更具體的建議
+            if "'NoneType' object has no attribute" in error_msg:
+                print(f"  This usually means Microsoft Word is not properly installed or accessible.")
+                print(f"  Try: 1) Ensure Microsoft Word is installed and licensed")
+                print(f"       2) Try running as administrator")
+                print(f"       3) Close any open Word documents")
+            elif "Access is denied" in error_msg:
+                print(f"  File access denied. Try running as administrator.")
+            else:
+                print(f"  You can manually open the Word file and save it as PDF")
+            pdf_outname = None
+    else:
+        print(f"PDF conversion skipped (docx2pdf not available)")
+        pdf_outname = None
+    
+    return docx_outname, pdf_outname
 
 def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
     """
@@ -268,8 +338,8 @@ def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
         if input_path.lower().endswith('.docx'):
             try:
                 print(f"Processing file: {input_path}")
-                output_file = format_and_calc_table(input_path)
-                processed_files.append(output_file)
+                docx_output, pdf_output = format_and_calc_table(input_path)
+                processed_files.append({'docx': docx_output, 'pdf': pdf_output})
                 print(f"✓ Successfully processed: {input_path}")
             except Exception as e:
                 print(f"✗ Processing failed: {input_path} - Error: {str(e)}")
@@ -292,14 +362,14 @@ def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
         
         for docx_file in docx_files:
             # Skip already formatted files
-            if os.path.basename(docx_file).startswith('Formatted_'):
+            if os.path.basename(docx_file).startswith('unused_'): # if you want to skip files that have been processed
                 print(f"Skipping already formatted file: {docx_file}")
                 continue
                 
             try:
                 print(f"Processing file: {docx_file}")
-                output_file = format_and_calc_table(docx_file)
-                processed_files.append(output_file)
+                docx_output, pdf_output = format_and_calc_table(docx_file)
+                processed_files.append({'docx': docx_output, 'pdf': pdf_output})
                 print(f"✓ Successfully processed: {docx_file}")
             except Exception as e:
                 print(f"✗ Processing failed: {docx_file} - Error: {str(e)}")
@@ -317,8 +387,13 @@ def batch_process_documents(input_path, recursive=True, file_pattern="*.docx"):
     
     if processed_files:
         print("\nSuccessfully processed files:")
-        for file in processed_files:
-            print(f"  - {file}")
+        for file_pair in processed_files:
+            print(f"  Word: {file_pair['docx']}")
+            if file_pair['pdf']:
+                print(f"  PDF:  {file_pair['pdf']}")
+            else:
+                print(f"  PDF:  (not generated)")
+            print()
     
     if failed_files:
         print("\nFailed to process files:")

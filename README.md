@@ -1,6 +1,6 @@
 # 📄 Miki Word 文件格式化工具
 
-自動為 Word 文件中的表格添加總計行，支援批量處理。
+自動為 Word 文件中的表格添加總計行，支援批量處理，**同時生成 Word 和 PDF 兩種格式**。
 
 ## 🚀 快速使用（最終用戶）
 
@@ -19,7 +19,10 @@
 # 1. 安裝依賴
 pip install -r requirements.txt
 
-# 2. 測試運行
+# 2. 額外安裝 PDF 轉換庫
+pip install docx2pdf
+
+# 3. 測試運行
 python gui_formatter.py
 ```
 
@@ -35,28 +38,16 @@ miki_formatter/
 
 ### 關鍵修改點
 
-#### 修改輸出檔案命名（main.py 第247行）
-```python
-outname = os.path.join(success_dir, f"Formatted_{name}{ext}")
-# 修改 "Formatted_" 部分
-```
-
-#### 修改輸出目錄（main.py 第240行）
-```python
-success_dir = os.path.join(dir_path, "success")
-# 修改 "success" 部分  
-```
-
 #### 修改版本號（gui_formatter.py 第8行）
 ```python
 VERSION = "1.0.0"  # 更新版本號
 ```
 
-#### 修改界面文字（gui_formatter.py）
-搜尋並修改：`"📄 選擇文件"`、`"🚀 開始處理"` 等
+### PDF 功能說明
+- 工具支援**自動降級**：如果 `docx2pdf` 未安裝，只生成 Word 文件
+- PDF 轉換需要 Microsoft Word 已安裝
+- 建議使用虛擬環境確保依賴正確安裝
 
-### 修改代碼流程
-1. **修改代碼** → 2. **本地測試**：`python gui_formatter.py` → 3. **重新打包**：雙擊 `簡易打包.bat` → 4. **測試執行檔**
 
 ### ⚠️ 重要提醒
 - **不要修改** 表格欄位定義：`["Package", "Service", "Type", "Purchased", "Used", "Remaining", "Trend"]`
@@ -68,6 +59,7 @@ VERSION = "1.0.0"  # 更新版本號
 |------|----------|
 | GUI 無法啟動 | `python --version` 檢查環境 |
 | 找不到模組 | `pip install -r requirements.txt` |
+| PDF 功能不可用 | `pip install docx2pdf` |
 | 打包失敗 | `pip install pyinstaller` |
 | 執行檔無法運行 | 使用啟動程式.bat |
 
@@ -99,16 +91,18 @@ python main.py
 ## 📋 功能特點
 
 ✅ **批量處理** - 單個文件或整個目錄  
-✅ **智能過濾** - 跳過已處理文件（Formatted_）  
+✅ **雙格式輸出** - 同時生成 Word 和 PDF 文件  
+✅ **智能過濾** - 跳過已處理文件（unused_）  
 ✅ **錯誤處理** - 失敗不影響其他文件  
 ✅ **格式保持** - 保持原始表格格式  
+✅ **黃色標記** - 總計行部分高亮顯示  
 ✅ **GUI 界面** - 友善的圖形界面  
 
 ## 📦 系統要求
 
 - **最終用戶**：Windows 10/11（不需要 Python）
-- **開發者**：Python 3.6+, python-docx, tkinter
+- **開發者**：Python 3.6+, python-docx, docx2pdf, tkinter
 
 ---
 
-**版本**: 1.0.0 | **最後更新**: 2025年8月7日
+**版本**: 1.0.1 | **最後更新**: 2025年8月7日
