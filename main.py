@@ -188,7 +188,7 @@ def highlight_table_yellow(tbl):
         elif header == 'Trend':
             percent = 0.0
             if purchased_sum > 0:
-                percent = used_sum * 24 / purchased_sum 
+                percent = (used_sum / 60)  / purchased_sum * 100 
             content = f"{percent:.2f}%"
         else:
             content = ''
